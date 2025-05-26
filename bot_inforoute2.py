@@ -14,7 +14,7 @@ COMMENT_GROUP_ID = -1002540408114
 BYPASS_CONFIRM_GROUP_ID = -1002344064291
 
 # === POSTGRESQL CONFIG ===
-PG_DSN = os.getenv("DATABASE_URL")  # Exemple : 'postgresql://user:password@host:port/dbname'
+PG_DSN = os.getenv("postgresql://postgres:Subaru92111608*@db.elrknxezsoztdyoavdgc.supabase.co:5432/postgres")  # Exemple : 'postgresql://user:password@host:port/dbname'
 
 # === STOCKAGE TEMPORAIRE ===
 pending_messages = {}
