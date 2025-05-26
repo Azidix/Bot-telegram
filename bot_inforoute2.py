@@ -20,6 +20,9 @@ BYPASS_CONFIRM_GROUP_ID = -1002344064291
 # === POSTGRESQL CONFIG ===
 PG_DSN = os.getenv("DATABASE_URL")  # Exemple : 'postgresql://user:password@host:port/dbname'
 
+if not PG_DSN:
+    raise ValueError("DATABASE_URL est introuvable. Assure-toi qu'elle est bien définie dans Render.")
+
 # === STOCKAGE TEMPORAIRE ===
 pending_messages = {}
 message_links = {}
@@ -197,4 +200,4 @@ if __name__ == '__main__':
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     print("Bot démarré...")
     app.run_polling()
-    
+
