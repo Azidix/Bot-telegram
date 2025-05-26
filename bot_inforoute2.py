@@ -2,9 +2,13 @@ import logging
 import asyncio
 import asyncpg
 import os
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+from dotenv import load_dotenv
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (ApplicationBuilder, CallbackQueryHandler,
                           ContextTypes, MessageHandler, CommandHandler, filters)
+
+# === CHARGEMENT DES VARIABLES D'ENVIRONNEMENT ===
+load_dotenv()
 
 # === CONFIGURATION ===
 BOT_TOKEN = "7630579050:AAH3rGEWP2RjFWGJ4CyAw843Qs1KN8IjrLI"
@@ -14,7 +18,7 @@ COMMENT_GROUP_ID = -1002540408114
 BYPASS_CONFIRM_GROUP_ID = -1002344064291
 
 # === POSTGRESQL CONFIG ===
-PG_DSN = os.getenv("postgresql://postgres:Subaru92111608*@db.elrknxezsoztdyoavdgc.supabase.co:5432/postgres")  # Exemple : 'postgresql://user:password@host:port/dbname'
+PG_DSN = os.getenv("DATABASE_URL")  # Exemple : 'postgresql://user:password@host:port/dbname'
 
 # === STOCKAGE TEMPORAIRE ===
 pending_messages = {}
@@ -103,7 +107,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.contact
     if contact.user_id == update.effective_user.id:
         await save_user_contact(contact.user_id, contact.phone_number)
-        await update.message.reply_text("✅ Merci, ton numéro a bien été enregistré.", reply_markup=ReplyKeyboardMarkup([[]], remove_keyboard=True))
+        await update.message.reply_text("✅ Merci, ton numéro a bien été enregistré.", reply_markup=ReplyKeyboardRemove())
     else:
         await update.message.reply_text("⚠️ Ce numéro ne correspond pas à ton compte.")
 
@@ -193,3 +197,4 @@ if __name__ == '__main__':
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     print("Bot démarré...")
     app.run_polling()
+    
