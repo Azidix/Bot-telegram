@@ -18,7 +18,7 @@ COMMENT_GROUP_ID = -1002540408114
 BYPASS_CONFIRM_GROUP_ID = -1002344064291
 
 # === POSTGRESQL CONFIG ===
-PG_DSN = os.getenv("DATABASE_URL")  # Exemple : 'postgresql://user:password@host:port/dbname'
+PG_DSN = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
 
 if not PG_DSN:
     raise ValueError("DATABASE_URL est introuvable. Assure-toi qu'elle est bien définie dans Render.")
