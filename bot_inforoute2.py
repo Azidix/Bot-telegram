@@ -114,7 +114,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await message.reply_text("Ton message est-il correct ?", reply_markup=reply_markup)
 
-# === CALLBACK DES BOUTONS INLINE ===
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     try:
@@ -156,36 +155,37 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 raise ValueError("callback_data invalide pour deleteban")
             message_id = int(parts[1])
             user_id = int(parts[2])
+
             blocked_users.add(user_id)
             save_blacklist()
             await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=message_id)
 
+            # Récupérer infos utilisateur
             user_info = await context.bot.get_chat(user_id)
             full_name = f"{user_info.first_name} {user_info.last_name}" if user_info.last_name else user_info.first_name
             phone = user_contacts.get(str(user_id), "Non fourni")
             username = f"@{user_info.username}" if user_info.username else "aucun"
 
-            # Récupère le message d'origine dans message_links
-original_text = "Non disponible"
-for log_id, val in message_links.items():
-    if isinstance(val, dict) and val["canal_id"] == message_id:
-        original_text = val.get("text", "Non disponible")
-        del message_links[log_id]
-        break
+            # Récupérer texte original si dispo
+            original_text = "Non disponible"
+            for log_id, val in list(message_links.items()):
+                if isinstance(val, dict) and val["canal_id"] == message_id:
+                    original_text = val.get("text", "Non disponible")
+                    del message_links[log_id]
+                    break
 
-await context.bot.send_message(
-    chat_id=ADMIN_LOG_GROUP_ID,
-    text=(
-        f"✉️ Message supprimé et utilisateur banni\n"
-        f"👤 Nom : {full_name}\n"
-        f"🔗 Username : {username}\n"
-        f"🆔 ID : `{user_id}`\n"
-        f"📞 Téléphone : `{phone}`\n\n"
-        f"📨 Message :\n{original_text}"
-    ),
-    parse_mode="Markdown"
-)
-
+            await context.bot.send_message(
+                chat_id=ADMIN_LOG_GROUP_ID,
+                text=(
+                    f"✉️ Message supprimé et utilisateur banni\n"
+                    f"👤 Nom : {full_name}\n"
+                    f"🔗 Username : {username}\n"
+                    f"🆔 ID : `{user_id}`\n"
+                    f"📞 Téléphone : `{phone}`\n\n"
+                    f"📨 Message :\n{original_text}"
+                ),
+                parse_mode="Markdown"
+            )
 
             await query.edit_message_text(
                 text=f"🗑 Message supprimé du canal et utilisateur `{user_id}` banni !",
@@ -195,15 +195,16 @@ await context.bot.send_message(
 
         elif action == "delete":
             message_id = int(parts[1])
-            for log_id, value in list(message_links.items()):
-                if isinstance(value, dict) and value["canal_id"] == message_id:
-                    user_id = value["user_id"]
+            for log_id, val in list(message_links.items()):
+                if isinstance(val, dict) and val["canal_id"] == message_id:
+                    user_id = val["user_id"]
                     await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=message_id)
 
                     user_info = await context.bot.get_chat(user_id)
                     full_name = f"{user_info.first_name} {user_info.last_name}" if user_info.last_name else user_info.first_name
                     phone = user_contacts.get(str(user_id), "Non fourni")
                     username = f"@{user_info.username}" if user_info.username else "aucun"
+                    original_text = val.get("text", "Non disponible")
 
                     await context.bot.send_message(
                         chat_id=ADMIN_LOG_GROUP_ID,
@@ -213,7 +214,7 @@ await context.bot.send_message(
                             f"🔗 Username : {username}\n"
                             f"🆔 ID : `{user_id}`\n"
                             f"📞 Téléphone : `{phone}`\n\n"
-                            f"📨 Message :\n{value.get('text', 'Non disponible')}"
+                            f"📨 Message :\n{original_text}"
                         ),
                         parse_mode="Markdown"
                     )
@@ -272,16 +273,14 @@ await context.bot.send_message(
                 reply_markup=keyboard,
                 parse_mode="Markdown"
             )
-            logging.info("✅ Log envoyé au groupe admin.")
         except Exception as e:
             logging.error(f"❌ Erreur lors de l'envoi au groupe admin : {e}")
 
         message_links[message_id] = {
-    "canal_id": sent.message_id,
-    "user_id": user.id,
-    "text": original.text
-}
-
+            "canal_id": sent.message_id,
+            "user_id": user.id,
+            "text": original.text
+        }
         del pending_messages[key]
         await query.edit_message_text("✅ Message envoyé avec succès. Merci beaucoup pour ta participation =)")
 
