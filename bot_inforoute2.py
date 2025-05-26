@@ -165,18 +165,27 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             phone = user_contacts.get(str(user_id), "Non fourni")
             username = f"@{user_info.username}" if user_info.username else "aucun"
 
-            await context.bot.send_message(
-                chat_id=ADMIN_LOG_GROUP_ID,
-                text=(
-                    f"✉️ Message supprimé et utilisateur banni\n"
-                    f"👤 Nom : {full_name}\n"
-                    f"🔗 Username : {username}\n"
-                    f"🆔 ID : `{user_id}`\n"
-                    f"📞 Téléphone : `{phone}`\n\n"
-                    f"📨 Message :\n{value.get('text', 'Non disponible')}"
-                ),
-                parse_mode="Markdown"
-            )
+            # Récupère le message d'origine dans message_links
+original_text = "Non disponible"
+for log_id, val in message_links.items():
+    if isinstance(val, dict) and val["canal_id"] == message_id:
+        original_text = val.get("text", "Non disponible")
+        del message_links[log_id]
+        break
+
+await context.bot.send_message(
+    chat_id=ADMIN_LOG_GROUP_ID,
+    text=(
+        f"✉️ Message supprimé et utilisateur banni\n"
+        f"👤 Nom : {full_name}\n"
+        f"🔗 Username : {username}\n"
+        f"🆔 ID : `{user_id}`\n"
+        f"📞 Téléphone : `{phone}`\n\n"
+        f"📨 Message :\n{original_text}"
+    ),
+    parse_mode="Markdown"
+)
+
 
             await query.edit_message_text(
                 text=f"🗑 Message supprimé du canal et utilisateur `{user_id}` banni !",
