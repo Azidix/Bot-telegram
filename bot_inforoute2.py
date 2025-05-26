@@ -1,6 +1,6 @@
 import logging
 import asyncio
-import json
+import asyncpg
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (ApplicationBuilder, CallbackQueryHandler,
@@ -13,34 +13,66 @@ ADMIN_LOG_GROUP_ID = -1002344064291
 COMMENT_GROUP_ID = -1002540408114
 BYPASS_CONFIRM_GROUP_ID = -1002344064291
 
+# === POSTGRESQL CONFIG ===
+PG_DSN = os.getenv("DATABASE_URL")  # Exemple : 'postgresql://user:password@host:port/dbname'
+
 # === STOCKAGE TEMPORAIRE ===
 pending_messages = {}
 message_links = {}
-blocked_users = set()
 user_contacts = {}
 
-# === FICHIERS DE DONNÉES ===
-BLACKLIST_FILE = "blocked_ids.json"
-CONTACTS_FILE = "contacts.json"
+# === INIT DB ===
+async def init_db():
+    conn = await asyncpg.connect(dsn=PG_DSN)
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS blacklist (
+            user_id BIGINT PRIMARY KEY
+        )
+    """)
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS contacts (
+            user_id BIGINT PRIMARY KEY,
+            phone TEXT
+        )
+    """)
+    await conn.close()
 
-def load_data():
-    global blocked_users, user_contacts
-    if os.path.exists(BLACKLIST_FILE):
-        with open(BLACKLIST_FILE, "r") as f:
-            blocked_users = set(json.load(f))
-    if os.path.exists(CONTACTS_FILE):
-        with open(CONTACTS_FILE, "r") as f:
-            user_contacts = json.load(f)
+# === DB FUNCTIONS ===
+async def block_user_id(user_id):
+    conn = await asyncpg.connect(dsn=PG_DSN)
+    await conn.execute("INSERT INTO blacklist (user_id) VALUES ($1) ON CONFLICT DO NOTHING", user_id)
+    await conn.close()
 
-def save_blacklist():
-    with open(BLACKLIST_FILE, "w") as f:
-        json.dump(list(blocked_users), f)
+async def unblock_user_id(user_id):
+    conn = await asyncpg.connect(dsn=PG_DSN)
+    await conn.execute("DELETE FROM blacklist WHERE user_id = $1", user_id)
+    await conn.close()
 
-def save_contacts():
-    with open(CONTACTS_FILE, "w") as f:
-        json.dump(user_contacts, f)
+async def get_blocked_users():
+    conn = await asyncpg.connect(dsn=PG_DSN)
+    rows = await conn.fetch("SELECT user_id FROM blacklist")
+    await conn.close()
+    return [row["user_id"] for row in rows]
 
-load_data()
+async def is_user_blocked(user_id):
+    conn = await asyncpg.connect(dsn=PG_DSN)
+    row = await conn.fetchrow("SELECT 1 FROM blacklist WHERE user_id = $1", user_id)
+    await conn.close()
+    return row is not None
+
+async def save_user_contact(user_id, phone):
+    conn = await asyncpg.connect(dsn=PG_DSN)
+    await conn.execute("""
+        INSERT INTO contacts (user_id, phone) VALUES ($1, $2)
+        ON CONFLICT (user_id) DO UPDATE SET phone = $2
+    """, user_id, phone)
+    await conn.close()
+
+async def get_user_contact(user_id):
+    conn = await asyncpg.connect(dsn=PG_DSN)
+    row = await conn.fetchrow("SELECT phone FROM contacts WHERE user_id = $1", user_id)
+    await conn.close()
+    return row["phone"] if row else "Non enregistré"
 
 # === LOGGING ===
 logging.basicConfig(level=logging.INFO)
@@ -48,7 +80,8 @@ logging.basicConfig(level=logging.INFO)
 # === DEMANDE DE CONTACT À LA PREMIÈRE INTERACTION ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if str(user.id) in user_contacts:
+    phone = await get_user_contact(user.id)
+    if phone != "Non enregistré":
         await update.message.reply_text("✅ Ton numéro est déjà enregistré.")
         return
 
@@ -69,14 +102,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.contact
     if contact.user_id == update.effective_user.id:
-        user_contacts[str(contact.user_id)] = contact.phone_number
-        save_contacts()
+        await save_user_contact(contact.user_id, contact.phone_number)
         await update.message.reply_text("✅ Merci, ton numéro a bien été enregistré.", reply_markup=ReplyKeyboardMarkup([[]], remove_keyboard=True))
     else:
         await update.message.reply_text("⚠️ Ce numéro ne correspond pas à ton compte.")
 
 # === COMMANDE: LISTE DES BLOQUÉS ===
 async def blocked_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    blocked_users = await get_blocked_users()
     if not blocked_users:
         await update.message.reply_text("✅ Aucun utilisateur bloqué.")
         return
@@ -99,8 +132,7 @@ async def unblock_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     try:
         user_id = int(context.args[0])
-        blocked_users.discard(user_id)
-        save_blacklist()
+        await unblock_user_id(user_id)
         await update.message.reply_text(f"✅ Utilisateur {user_id} débloqué.")
     except:
         await update.message.reply_text("❌ Erreur de format. Utilise un ID valide.")
@@ -112,8 +144,7 @@ async def block_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     try:
         user_id = int(context.args[0])
-        blocked_users.add(user_id)
-        save_blacklist()
+        await block_user_id(user_id)
         await update.message.reply_text(f"⛔️ Utilisateur {user_id} bloqué.")
     except:
         await update.message.reply_text("❌ Erreur de format. Utilise un ID valide.")
@@ -124,8 +155,8 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Utilisation : /phone <user_id>")
         return
     try:
-        user_id = str(int(context.args[0]))
-        phone = user_contacts.get(user_id, "Non enregistré")
+        user_id = int(context.args[0])
+        phone = await get_user_contact(user_id)
         await update.message.reply_text(f"📞 Numéro pour l'utilisateur `{user_id}` : `{phone}`", parse_mode="Markdown")
     except Exception:
         await update.message.reply_text("❌ Erreur lors de la récupération du numéro.")
@@ -147,6 +178,9 @@ async def find_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # === MAIN ===
 if __name__ == '__main__':
+    import asyncio
+    asyncio.run(init_db())
+
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -157,8 +191,5 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("finduser", find_user))
 
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app.add_handler(CallbackQueryHandler(button_callback))
-
     print("Bot démarré...")
     app.run_polling()
