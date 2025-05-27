@@ -183,9 +183,8 @@ async def find_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Utilisateur introuvable.")
 
 # === MAIN ===
-if __name__ == '__main__':
-    import asyncio
-    asyncio.run(init_db())
+async def main():
+    await init_db()
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -195,7 +194,10 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("blocked", blocked_list))
     app.add_handler(CommandHandler("phone", get_phone))
     app.add_handler(CommandHandler("finduser", find_user))
-
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
+
     print("Bot démarré...")
-    app.run_polling()
+    await app.run_polling()
+
+if __name__ == '__main__':
+    asyncio.run(main())
