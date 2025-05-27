@@ -17,11 +17,10 @@ ADMIN_LOG_GROUP_ID = -1002344064291
 COMMENT_GROUP_ID = -1002540408114
 BYPASS_CONFIRM_GROUP_ID = -1002344064291
 
-# === POSTGRESQL CONFIG PAR VARIABLES SÉPARÉES ===
+# === POSTGRESQL CONFIG VIA DATABASE_URL ===
 PG_DSN = os.getenv("DATABASE_URL")
-
-if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME]):
-    raise ValueError("Une ou plusieurs variables d'environnement PostgreSQL sont manquantes.")
+if not PG_DSN:
+    raise ValueError("La variable d'environnement DATABASE_URL est manquante.")
 
 # === STOCKAGE TEMPORAIRE ===
 pending_messages = {}
