@@ -205,13 +205,11 @@ async def main():
     )
 
 if __name__ == '__main__':
-    try:
-        asyncio.run(main())
-    except RuntimeError as e:
-        if "already running" in str(e):
-            loop = asyncio.get_event_loop()
-            loop.create_task(main())
-            loop.run_forever()
-        else:
-            raise
+    import nest_asyncio
+    import asyncio
 
+    nest_asyncio.apply()
+    loop = asyncio.get_event_loop()
+    loop.create_task(main())
+    loop.run_forever()
+  
