@@ -202,7 +202,8 @@ async def main():
     await app.run_webhook(
         listen="0.0.0.0",
         port=PORT,
-        webhook_url=WEBHOOK_URL
+        webhook_url=WEBHOOK_URL,
+        shutdown_on_stop=False  # empêche de fermer la boucle en double
     )
 
 if __name__ == '__main__':
