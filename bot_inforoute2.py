@@ -16,7 +16,8 @@ CHANNEL_ID = -1002679914144
 ADMIN_LOG_GROUP_ID = -1002344064291
 COMMENT_GROUP_ID = -1002540408114
 BYPASS_CONFIRM_GROUP_ID = -1002344064291
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # URL publique de ton bot hébergé
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+PORT = int(os.environ.get("PORT", 8080))
 
 # === POSTGRESQL CONFIG VIA DATABASE_URL ===
 PG_DSN = os.getenv("DATABASE_URL")
@@ -200,16 +201,12 @@ async def main():
     print("Bot démarré avec webhook...")
     await app.run_webhook(
         listen="0.0.0.0",
-        port=int(os.environ.get("PORT", 8080)),
+        port=PORT,
         webhook_url=WEBHOOK_URL
     )
 
 if __name__ == '__main__':
     import nest_asyncio
-    import asyncio
-
     nest_asyncio.apply()
-    loop = asyncio.get_event_loop()
-    loop.create_task(main())
-    loop.run_forever()
-  
+    asyncio.get_event_loop().create_task(main())
+    asyncio.get_event_loop().run_forever()
