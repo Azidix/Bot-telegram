@@ -196,11 +196,11 @@ async def main():
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
 
     print("Bot démarré avec webhook...")
-await app.run_webhook(
-    listen="0.0.0.0",
-    port=PORT,
-    webhook_url=WEBHOOK_URL
-)
+    await app.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        webhook_url=WEBHOOK_URL
+    )
 
 if __name__ == '__main__':
     asyncio.run(main())
