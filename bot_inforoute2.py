@@ -203,7 +203,6 @@ async def main():
     )
 
 if __name__ == '__main__':
-    if __name__ == '__main__':
     import nest_asyncio
     import asyncio
 
