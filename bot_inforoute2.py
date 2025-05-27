@@ -195,21 +195,12 @@ async def main():
     app.add_handler(CommandHandler("finduser", find_user))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
 
-    asyncio.create_task(app.run_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        webhook_url=WEBHOOK_URL
-    ))
-
-    runner = web.AppRunner(web.Application())
-    runner.app.router.add_get("/", lambda request: web.Response(text="Bot is running"))
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
-
-    print("Bot démarré avec webhook et serveur de santé.")
-    while True:
-        await asyncio.sleep(3600)
+    print("Bot démarré avec webhook...")
+await app.run_webhook(
+    listen="0.0.0.0",
+    port=PORT,
+    webhook_url=WEBHOOK_URL
+)
 
 if __name__ == '__main__':
     asyncio.run(main())
