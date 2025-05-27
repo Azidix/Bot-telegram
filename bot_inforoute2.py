@@ -17,7 +17,7 @@ ADMIN_LOG_GROUP_ID = -1002344064291
 COMMENT_GROUP_ID = -1002540408114
 BYPASS_CONFIRM_GROUP_ID = -1002344064291
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-PORT = int(os.environ.get("PORT", 8080))
+PORT = int(os.environ.get("PORT", 10000))
 
 # === POSTGRESQL CONFIG VIA DATABASE_URL ===
 PG_DSN = os.getenv("DATABASE_URL")
@@ -206,7 +206,4 @@ async def main():
     )
 
 if __name__ == '__main__':
-    import nest_asyncio
-    nest_asyncio.apply()
-    asyncio.get_event_loop().create_task(main())
-    asyncio.get_event_loop().run_forever()
+    asyncio.run(main())
