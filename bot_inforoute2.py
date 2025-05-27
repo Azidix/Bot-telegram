@@ -203,4 +203,12 @@ async def main():
     )
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    if __name__ == '__main__':
+    import nest_asyncio
+    import asyncio
+
+    nest_asyncio.apply()
+    loop = asyncio.get_event_loop()
+    loop.create_task(main())
+    loop.run_forever()
+
