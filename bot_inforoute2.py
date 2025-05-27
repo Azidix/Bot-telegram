@@ -11,11 +11,12 @@ from telegram.ext import (ApplicationBuilder, CallbackQueryHandler,
 load_dotenv()
 
 # === CONFIGURATION ===
-BOT_TOKEN = "7630579050:AAH3rGEWP2RjFWGJ4CyAw843Qs1KN8IjrLI"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = -1002679914144
 ADMIN_LOG_GROUP_ID = -1002344064291
 COMMENT_GROUP_ID = -1002540408114
 BYPASS_CONFIRM_GROUP_ID = -1002344064291
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # URL publique de ton bot hébergé
 
 # === POSTGRESQL CONFIG VIA DATABASE_URL ===
 PG_DSN = os.getenv("DATABASE_URL")
@@ -196,14 +197,12 @@ async def main():
     app.add_handler(CommandHandler("finduser", find_user))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
 
-    print("Bot démarré...")
-    await app.run_polling()
+    print("Bot démarré avec webhook...")
+    await app.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 8080)),
+        webhook_url=WEBHOOK_URL
+    )
 
 if __name__ == '__main__':
-    import nest_asyncio
-    nest_asyncio.apply()
-
-    import asyncio
-    loop = asyncio.get_event_loop()
-    loop.create_task(main())
-    loop.run_forever()
+    asyncio.run(main())
