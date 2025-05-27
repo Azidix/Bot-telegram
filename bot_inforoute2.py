@@ -181,6 +181,15 @@ async def find_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         await update.message.reply_text("Utilisateur introuvable.")
 
+# === AIOHTTP SERVER FOR RENDER ===
+async def handle_root(request):
+    return web.Response(text="Bot is alive.")
+
+def run_http_server():
+    app = web.Application()
+    app.router.add_get("/", handle_root)
+    web.run_app(app, port=PORT)
+
 # === MAIN ===
 async def main():
     await init_db()
@@ -204,7 +213,8 @@ async def main():
 
 if __name__ == '__main__':
     import nest_asyncio
-    import asyncio
-
+    import threading
     nest_asyncio.apply()
-    asyncio.get_event_loop().run_until_complete(main())
+
+    threading.Thread(target=run_http_server, daemon=True).start()
+    asyncio.run(main())
