@@ -208,8 +208,8 @@ async def main():
 
 if __name__ == '__main__':
     import nest_asyncio
-nest_asyncio.apply()
-loop = asyncio.get_event_loop()
-loop.create_task(main())
-loop.run_forever()
+    nest_asyncio.apply()
+    loop = asyncio.get_event_loop()
+    loop.create_task(main())
+    loop.run_forever()
 
