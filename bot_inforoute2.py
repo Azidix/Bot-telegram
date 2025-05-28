@@ -200,20 +200,22 @@ async def main():
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
 
     async def run():
-        runner = web.AppRunner(web.Application())
-        await runner.setup()
-        site = web.TCPSite(runner, "0.0.0.0", PORT)
-        await site.start()
+    # Crée l'app AIOHTTP d'abord
+    aio_app = web.Application()
+    aio_app.router.add_get("/", handle_root)  # On ajoute la route ici AVANT runner.setup()
 
-        # Ajoute la route / pour le GET
-        runner.app.router.add_get("/", handle_root)
+    # Puis démarre le serveur HTTP aiohttp
+    runner = web.AppRunner(aio_app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
 
-        print("Bot démarré avec webhook...")
-        await app.run_webhook(
-            listen="0.0.0.0",
-            port=PORT,
-            webhook_url=WEBHOOK_URL
-        )
+    print("Bot démarré avec webhook...")
+    await app.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        webhook_url=WEBHOOK_URL
+    )
 
     await run()
 
