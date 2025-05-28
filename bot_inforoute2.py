@@ -172,7 +172,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif action == "delete" and len(data) == 2:
             msg_id = int(data[1])
-            for uid, message in pending_messages.items():
+            value = message_links.get(msg_id)
+            if value:
+                uid = value["user_id"]
+                text = value["text"]
                 try:
                     await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
                     user = await context.bot.get_chat(uid)
@@ -186,15 +189,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             f"🔗 Username : @{user.username if user.username else 'Aucun'}\n"
                             f"🆔 ID : `{uid}`\n"
                             f"📞 Téléphone : `{phone}`\n"
-                            f"\n📨 Message :\n```{message}```"
+                            f"\n📨 Message :\n```{text}```"
                         ),
                         parse_mode="Markdown"
                     )
 
                     await query.edit_message_text("🗑 Message supprimé.")
-                    break
-                except Exception:
-                    continue
+                    del message_links[msg_id]
+                except Exception as e:
+                    logging.warning(f"Erreur lors de la suppression du message {msg_id}: {e}")
+                    await query.edit_message_text("⚠️ Impossible de supprimer ce message.")
+            else:
+                await query.edit_message_text("⚠️ Message non reconnu.")
 
         elif action == "ban" and len(data) == 3:
             uid = int(data[1])
@@ -226,7 +232,6 @@ async def confirm_and_forward(user_id, message, context):
     phone = await get_user_contact(user_id)
     sent = await context.bot.send_message(chat_id=CHANNEL_ID, text=message)
 
-    # Planifier la suppression automatique
     context.application.create_task(auto_delete_message(context, sent.message_id))
 
     admin_text = (
@@ -243,6 +248,8 @@ async def confirm_and_forward(user_id, message, context):
             InlineKeyboardButton("🚫 Sup & Ban", callback_data=f"ban|{user_id}|{sent.message_id}")
         ]
     ])
+
+    message_links[sent.message_id] = {"user_id": user_id, "text": message}
 
     await context.bot.send_message(chat_id=ADMIN_LOG_GROUP_ID, text=admin_text, parse_mode="Markdown", reply_markup=buttons)
 
