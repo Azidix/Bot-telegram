@@ -165,11 +165,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Envoie résumé dans le groupe admin avec les boutons
         admin_text = (
-        f"📩 *Message reçu :*\n"
-        f"```{message}```\n\n"
-        f"👤 *Utilisateur* : @{user.username if user.username else 'Aucun'}\n"
-        f"🆔 *ID* : `{user_id}`\n"
-        f"📞 *Téléphone* : `{phone}`"
+            f"📩 *Message reçu :*\n"
+            f"👤 *Utilisateur* : @{user.username if user.username else 'Aucun'}\n"
+            f"🆔 *ID* : `{user_id}`\n"
+            f"📞 *Téléphone* : `{phone}`"
+            f"```{message}```\n\n"
         )
 
         buttons = InlineKeyboardMarkup([
