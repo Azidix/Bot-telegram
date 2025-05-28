@@ -181,19 +181,6 @@ async def find_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         await update.message.reply_text("Utilisateur introuvable.")
 
-# === ROUTE POUR VÉRIFIER SI LE BOT EST EN VIE ===
-async def handle_root(request):
-    return web.Response(text="Bot is alive.")
-
-# === LANCE LE SERVEUR HTTP AIOHTTP ===
-async def start_web_server():
-    app = web.Application()
-    app.router.add_get("/", handle_root)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
-
 # === MAIN ===
 async def main():
     await init_db()
@@ -207,8 +194,6 @@ async def main():
     app.add_handler(CommandHandler("phone", get_phone))
     app.add_handler(CommandHandler("finduser", find_user))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
-
-    await start_web_server()
 
     print("Bot démarré avec webhook...")
     await app.run_webhook(
