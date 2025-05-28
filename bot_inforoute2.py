@@ -163,7 +163,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
         await query.edit_message_text("🗑 Message supprimé.")
 
-        await context.bot.send_message(chat_id=ADMIN_LOG_GROUP_ID, text=f"🗑 Message supprimé dans le canal :\n\nID : `{msg_id}`", parse_mode="Markdown")
+        await context.bot.send_message(
+              chat_id=ADMIN_LOG_GROUP_ID,
+              text=(
+                  f"✉️ Message supprimé du canal\n"
+                  f"👤 Nom : {full_name}\n"
+                  f"🔗 Username : {username}\n"
+                  f"🆔 ID : `{user_id}`\n"
+                  f"📞 Téléphone : `{phone}`\n\n"
+                  f"📨 Message :\n{value.get('text', 'Non disponible')}"
+               ),
+               parse_mode="Markdown"
+          )
 
     elif action == "ban" and len(data) == 3:
         uid = int(data[1])
