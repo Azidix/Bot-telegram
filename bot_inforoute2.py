@@ -156,9 +156,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"👤 *Utilisateur* : @{user.username if user.username else 'Aucun'}\n"
             f"🆔 *ID* : `{user_id}`\n"
             f"📞 *Téléphone* : `{phone}`"
-          ),
-          parse_mode="Markdown"
-        )
+         )
 
         buttons = InlineKeyboardMarkup([
             [
