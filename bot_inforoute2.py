@@ -185,14 +185,18 @@ async def find_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_root(request):
     return web.Response(text="Bot is alive.")
 
-def run_http_server():
-    app = web.Application()
-    app.router.add_get("/", handle_root)
-    web.run_app(app, port=PORT)
+async def start_http_server():
+    http_app = web.Application()
+    http_app.router.add_get("/", handle_root)
+    runner = web.AppRunner(http_app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
 
 # === MAIN ===
 async def main():
     await init_db()
+    await start_http_server()
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -212,9 +216,4 @@ async def main():
     )
 
 if __name__ == '__main__':
-    import nest_asyncio
-    import threading
-    nest_asyncio.apply()
-
-    threading.Thread(target=run_http_server, daemon=True).start()
     asyncio.run(main())
