@@ -112,6 +112,53 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("⚠️ Ce numéro ne correspond pas à ton compte.")
 
+# === GESTION DES MESSAGES TEXTE ===
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    message = update.message.text
+
+    if await is_user_blocked(user_id):
+        await update.message.reply_text("⛔️ Tu es bloqué.")
+        return
+
+    phone = await get_user_contact(user_id)
+    if phone == "Non enregistré":
+        await update.message.reply_text("📞 Tu dois d’abord partager ton numéro.")
+        return
+
+    # Stocke temporairement le message en attente de validation
+    pending_messages[user_id] = message
+
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Oui !", callback_data="confirm_yes"),
+            InlineKeyboardButton("❌ Non ! Je me suis trompé", callback_data="confirm_no")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text("📝 Ton message est-il correct ?", reply_markup=reply_markup)
+
+# === GESTION DES RÉPONSES AUX BOUTONS ===
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    user_id = query.from_user.id
+    data = query.data
+
+    if data == "confirm_yes":
+        message = pending_messages.pop(user_id, None)
+        if message:
+            await context.bot.send_message(chat_id=CHANNEL_ID, text=message)
+            await query.edit_message_text("✅ Ton message a été transmis au canal.")
+        else:
+            await query.edit_message_text("⚠️ Aucun message trouvé à valider.")
+
+    elif data == "confirm_no":
+        pending_messages.pop(user_id, None)
+        await query.edit_message_text("❌ Message annulé. Tu peux renvoyer un nouveau message.")
+
 # === COMMANDE: LISTE DES BLOQUÉS ===
 async def blocked_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     blocked_users = await get_blocked_users()
@@ -181,6 +228,19 @@ async def find_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         await update.message.reply_text("Utilisateur introuvable.")
 
+# === ROUTE POUR VÉRIFIER SI LE BOT EST EN VIE ===
+async def handle_root(request):
+    return web.Response(text="Bot is alive.")
+
+# === LANCE LE SERVEUR HTTP AIOHTTP ===
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get("/", handle_root)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+
 # === MAIN ===
 async def main():
     await init_db()
@@ -194,6 +254,10 @@ async def main():
     app.add_handler(CommandHandler("phone", get_phone))
     app.add_handler(CommandHandler("finduser", find_user))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(CallbackQueryHandler(handle_callback))
+
+    await start_web_server()
 
     print("Bot démarré avec webhook...")
     await app.run_webhook(
