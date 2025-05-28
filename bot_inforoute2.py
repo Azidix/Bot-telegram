@@ -3,7 +3,6 @@ import asyncio
 import asyncpg
 import os
 from aiohttp import web
-import threading
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (ApplicationBuilder, CallbackQueryHandler,
                           ContextTypes, MessageHandler, CommandHandler, filters)
@@ -186,6 +185,7 @@ async def find_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_root(request):
     return web.Response(text="Bot is alive.")
 
+# === LANCE LE SERVEUR HTTP AIOHTTP ===
 async def start_web_server():
     app = web.Application()
     app.router.add_get("/", handle_root)
@@ -208,10 +208,9 @@ async def main():
     app.add_handler(CommandHandler("finduser", find_user))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
 
-    print("Bot démarré avec webhook...")
-
     await start_web_server()
 
+    print("Bot démarré avec webhook...")
     await app.run_webhook(
         listen="0.0.0.0",
         port=PORT,
