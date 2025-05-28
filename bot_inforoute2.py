@@ -124,16 +124,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📵 Tu dois d'abord partager ton numéro avec /start.")
         return
 
-    if await is_user_blocked(user_id):
-        await update.message.reply_text("🚫 Tu es actuellement bloqué et ne peux pas envoyer de messages.")
-        return
-
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Oui !", callback_data=f"confirm|{user_id}"),
-         InlineKeyboardButton("Non ! je me suis trompé", callback_data=f"cancel|{user_id}")]
+        [InlineKeyboardButton("✅ Oui, envoyer !", callback_data=f"confirm|{user_id}"),
+         InlineKeyboardButton("❌ Non, annuler", callback_data=f"cancel|{user_id}")]
     ])
 
-    await update.message.reply_text(f"📝 Ton message :\n\n{message}\n\nSouhaites-tu l'envoyer ?", reply_markup=keyboard)
+    await update.message.reply_text(f"📝 Ton message :\n\n{message}\n\nTon message est-il correct ?", reply_markup=keyboard)
     pending_messages[user_id] = message
 
 # === CALLBACK CONFIRMATION ===
@@ -160,12 +156,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"👤 *Utilisateur* : @{user.username if user.username else 'Aucun'}\n"
             f"🆔 *ID* : `{user_id}`\n"
             f"📞 *Téléphone* : `{phone}`"
+          ),
+          parse_mode="Markdown"
         )
 
         buttons = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("🗑 Poubelle", callback_data=f"delete|{sent.message_id}"),
-                InlineKeyboardButton("Sup & Ban", callback_data=f"ban|{user_id}|{sent.message_id}")
+                InlineKeyboardButton("🚫 Sup & Ban", callback_data=f"ban|{user_id}|{sent.message_id}")
             ]
         ])
 
