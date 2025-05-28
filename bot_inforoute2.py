@@ -2,6 +2,8 @@ import logging
 import asyncio
 import asyncpg
 import os
+from aiohttp import web
+import threading
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (ApplicationBuilder, CallbackQueryHandler,
                           ContextTypes, MessageHandler, CommandHandler, filters)
@@ -180,6 +182,15 @@ async def find_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         await update.message.reply_text("Utilisateur introuvable.")
 
+# === ROUTE POUR VÉRIFIER SI LE BOT EST EN VIE ===
+async def handle_root(request):
+    return web.Response(text="Bot is alive.")
+
+def start_web_server():
+    app = web.Application()
+    app.router.add_get("/", handle_root)
+    web.run_app(app, port=PORT)
+
 # === MAIN ===
 async def main():
     await init_db()
@@ -204,4 +215,5 @@ async def main():
 if __name__ == '__main__':
     import nest_asyncio
     nest_asyncio.apply()
+    threading.Thread(target=start_web_server).start()
     asyncio.get_event_loop().run_until_complete(main())
