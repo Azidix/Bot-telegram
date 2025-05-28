@@ -135,71 +135,84 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📝 Ton message :\n\n{message}\n\nTon message est-il correct ?", reply_markup=keyboard)
     pending_messages[user_id] = message
 
+# === SUPPRESSION AUTOMATIQUE APRÈS 3 HEURES ===
+async def auto_delete_message(context: ContextTypes.DEFAULT_TYPE, message_id: int):
+    await asyncio.sleep(3 * 60 * 60)
+    try:
+        await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=message_id)
+        logging.info(f"Message {message_id} supprimé automatiquement du canal.")
+    except Exception as e:
+        logging.warning(f"Erreur suppression automatique message {message_id} : {e}")
+
 # === CALLBACK CONFIRMATION ===
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data.split("|")
 
-    action = data[0]
-    if action == "confirm" and len(data) == 2:
-        user_id = int(data[1])
-        message = pending_messages.get(user_id)
-        if not message:
-            await query.edit_message_text("⚠️ Aucun message à envoyer.")
-            return
+    try:
+        action = data[0]
 
-        await confirm_and_forward(user_id, message, context)
-        await query.edit_message_text("✅ Ton message a été publié !")
-        del pending_messages[user_id]
+        if action in ["confirm", "cancel"] and len(data) == 2:
+            user_id = int(data[1])
 
-    elif action == "cancel" and len(data) == 2:
-        user_id = int(data[1])
-        await query.edit_message_text("❌ Message annulé.")
-        del pending_messages[user_id]
+            if action == "confirm":
+                message = pending_messages.get(user_id)
+                if not message:
+                    await query.edit_message_text("⚠️ Aucun message à envoyer.")
+                    return
 
-    elif action == "delete" and len(data) == 2:
-        msg_id = int(data[1])
-        await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
-        await query.edit_message_text("🗑 Message supprimé.")
+                await confirm_and_forward(user_id, message, context)
+                await query.edit_message_text("✅ Ton message a été publié !")
+                del pending_messages[user_id]
 
-        await context.bot.send_message(
-              chat_id=ADMIN_LOG_GROUP_ID,
-              text=(
-                  f"✉️ Message supprimé du canal\n"
-                  f"👤 Nom : {full_name}\n"
-                  f"🔗 Username : {username}\n"
-                  f"🆔 ID : `{user_id}`\n"
-                  f"📞 Téléphone : `{phone}`\n\n"
-                  f"📨 Message :\n{value.get('text', 'Non disponible')}"
-               ),
-               parse_mode="Markdown"
-          )
+            elif action == "cancel":
+                del pending_messages[user_id]
+                await query.edit_message_text("❌ Message annulé.")
 
-    elif action == "ban" and len(data) == 3:
-        uid = int(data[1])
-        msg_id = int(data[2])
-        phone = await get_user_contact(uid)
-        await save_user_contact(uid, phone)
-        await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
-        await block_user_id(uid)
-        await query.edit_message_text("🚫 Message supprimé et utilisateur banni.")
+        elif action == "delete" and len(data) == 2:
+            msg_id = int(data[1])
+            await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
+            await query.edit_message_text("🗑 Message supprimé.")
 
-        user = await context.bot.get_chat(uid)
-        summary = (
-            f"🚫 *Message supprimé et utilisateur banni*\n"
-            f"👤 Utilisateur : @{user.username if user.username else 'Aucun'}\n"
-            f"🆔 ID : `{uid}`\n"
-            f"📞 Téléphone : `{phone}`\n"
-            f"🗑 Message ID : `{msg_id}`"
-        )
-        await context.bot.send_message(chat_id=ADMIN_LOG_GROUP_ID, text=summary, parse_mode="Markdown")
+            await context.bot.send_message(
+                chat_id=ADMIN_LOG_GROUP_ID,
+                text=f"🗑 *Message supprimé du canal*\nID : `{msg_id}`",
+                parse_mode="Markdown"
+            )
+
+        elif action == "ban" and len(data) == 3:
+            uid = int(data[1])
+            msg_id = int(data[2])
+            message = pending_messages.get(uid, "Non disponible")
+            phone = await get_user_contact(uid)
+            await save_user_contact(uid, phone)
+            await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
+            await block_user_id(uid)
+            await query.edit_message_text("🚫 Message supprimé et utilisateur banni.")
+
+            user = await context.bot.get_chat(uid)
+            summary = (
+                f"🚫 *Message supprimé et utilisateur banni*\n"
+                f"👤 Utilisateur : @{user.username if user.username else 'Aucun'}\n"
+                f"🆔 ID : `{uid}`\n"
+                f"📞 Téléphone : `{phone}`\n"
+                f"📨 Message :\n```{message}```"
+            )
+            await context.bot.send_message(chat_id=ADMIN_LOG_GROUP_ID, text=summary, parse_mode="Markdown")
+
+    except Exception:
+        logging.exception("Erreur parsing callback_data :")
+        await query.edit_message_text("⚠️ Erreur dans les données du bouton.")
 
 # === FORWARD FUNCTION ===
 async def confirm_and_forward(user_id, message, context):
     user = await context.bot.get_chat(user_id)
     phone = await get_user_contact(user_id)
     sent = await context.bot.send_message(chat_id=CHANNEL_ID, text=message)
+
+    # Planifier la suppression automatique
+    context.application.create_task(auto_delete_message(context, sent.message_id))
 
     admin_text = (
         f"📩 *Message reçu :*\n"
