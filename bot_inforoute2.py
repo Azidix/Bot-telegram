@@ -124,6 +124,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📵 Tu dois d'abord partager ton numéro avec /start.")
         return
 
+    if update.message.chat.id == BYPASS_CONFIRM_GROUP_ID:
+        await confirm_and_forward(user_id, message, context)
+        return
+
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Oui, envoyer !", callback_data=f"confirm|{user_id}"),
          InlineKeyboardButton("❌ Non, annuler", callback_data=f"cancel|{user_id}")]
@@ -146,26 +150,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("⚠️ Aucun message à envoyer.")
             return
 
-        user = await context.bot.get_chat(user_id)
-        phone = await get_user_contact(user_id)
-        sent = await context.bot.send_message(chat_id=CHANNEL_ID, text=message)
-
-        admin_text = (
-            f"📩 *Message reçu :*\n"
-            f"```{message}```\n\n"
-            f"👤 *Utilisateur* : @{user.username if user.username else 'Aucun'}\n"
-            f"🆔 *ID* : `{user_id}`\n"
-            f"📞 *Téléphone* : `{phone}`"
-         )
-
-        buttons = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("🗑 Poubelle", callback_data=f"delete|{sent.message_id}"),
-                InlineKeyboardButton("🚫 Sup & Ban", callback_data=f"ban|{user_id}|{sent.message_id}")
-            ]
-        ])
-
-        await context.bot.send_message(chat_id=ADMIN_LOG_GROUP_ID, text=admin_text, parse_mode="Markdown", reply_markup=buttons)
+        await confirm_and_forward(user_id, message, context)
         await query.edit_message_text("✅ Ton message a été publié !")
         del pending_messages[user_id]
 
@@ -182,9 +167,34 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "ban" and len(data) == 3:
         uid = int(data[1])
         msg_id = int(data[2])
+        phone = await get_user_contact(uid)
+        await save_user_contact(uid, phone)  # assure que le téléphone reste enregistré
         await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
         await block_user_id(uid)
         await query.edit_message_text("🚫 Message supprimé et utilisateur banni.")
+
+# === FORWARD FUNCTION ===
+async def confirm_and_forward(user_id, message, context):
+    user = await context.bot.get_chat(user_id)
+    phone = await get_user_contact(user_id)
+    sent = await context.bot.send_message(chat_id=CHANNEL_ID, text=message)
+
+    admin_text = (
+        f"📩 *Message reçu :*\n"
+        f"```{message}```\n\n"
+        f"👤 *Utilisateur* : @{user.username if user.username else 'Aucun'}\n"
+        f"🆔 *ID* : `{user_id}`\n"
+        f"📞 *Téléphone* : `{phone}`"
+    )
+
+    buttons = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🗑 Poubelle", callback_data=f"delete|{sent.message_id}"),
+            InlineKeyboardButton("🚫 Sup & Ban", callback_data=f"ban|{user_id}|{sent.message_id}")
+        ]
+    ])
+
+    await context.bot.send_message(chat_id=ADMIN_LOG_GROUP_ID, text=admin_text, parse_mode="Markdown", reply_markup=buttons)
 
 # === COMMANDES ADMIN ===
 async def block_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
