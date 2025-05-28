@@ -156,10 +156,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         admin_text = (
             f"📩 *Message reçu :*\n"
+            f"```{message}```\n\n"
             f"👤 *Utilisateur* : @{user.username if user.username else 'Aucun'}\n"
             f"🆔 *ID* : `{user_id}`\n"
             f"📞 *Téléphone* : `{phone}`"
-            f"```{message}```\n\n"
         )
 
         buttons = InlineKeyboardMarkup([
@@ -191,7 +191,69 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("🚫 Message supprimé et utilisateur banni.")
 
 # === COMMANDES ADMIN ===
-# (restent inchangées)
+async def block_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Utilisation : /blockuser <user_id>")
+        return
+    try:
+        user_id = int(context.args[0])
+        await block_user_id(user_id)
+        await update.message.reply_text(f"⛔️ Utilisateur {user_id} bloqué.")
+    except:
+        await update.message.reply_text("❌ Erreur de format. Utilise un ID valide.")
+
+async def unblock_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Utilisation : /unblockuser <user_id>")
+        return
+    try:
+        user_id = int(context.args[0])
+        await unblock_user_id(user_id)
+        await update.message.reply_text(f"✅ Utilisateur {user_id} débloqué.")
+    except:
+        await update.message.reply_text("❌ Erreur de format. Utilise un ID valide.")
+
+async def blocked_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    blocked_users = await get_blocked_users()
+    if not blocked_users:
+        await update.message.reply_text("✅ Aucun utilisateur bloqué.")
+        return
+
+    text = "🚫 Liste des utilisateurs bloqués :\n"
+    for user_id in blocked_users:
+        username = "(inconnu)"
+        try:
+            user = await context.bot.get_chat(user_id)
+            username = f"@{user.username}" if user.username else "(aucun username)"
+        except:
+            pass
+        text += f"- `{user_id}` {username}\n"
+    await update.message.reply_text(text, parse_mode="Markdown")
+
+async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Utilisation : /phone <user_id>")
+        return
+    try:
+        user_id = int(context.args[0])
+        phone = await get_user_contact(user_id)
+        await update.message.reply_text(f"📞 Numéro pour l'utilisateur `{user_id}` : `{phone}`", parse_mode="Markdown")
+    except Exception:
+        await update.message.reply_text("❌ Erreur lors de la récupération du numéro.")
+
+async def find_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Utilisation : /finduser <user_id>")
+        return
+    try:
+        user_id = int(context.args[0])
+        user = await context.bot.get_chat(user_id)
+        full_name = f"{user.first_name} {user.last_name}" if user.last_name else user.first_name
+        await update.message.reply_text(
+            f"Nom : {full_name}\nUsername : @{user.username if user.username else 'Aucun'}\nID : {user.id}"
+        )
+    except Exception:
+        await update.message.reply_text("Utilisateur introuvable.")
 
 # === ROUTE POUR VÉRIFIER SI LE BOT EST EN VIE ===
 async def handle_root(request):
