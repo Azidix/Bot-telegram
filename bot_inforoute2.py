@@ -200,17 +200,19 @@ async def main():
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
 
     async def run():
-    # Crée l'app AIOHTTP d'abord
+    # Crée l'application AIOHTTP et ajoute la route GET avant runner.setup()
     aio_app = web.Application()
-    aio_app.router.add_get("/", handle_root)  # On ajoute la route ici AVANT runner.setup()
+    aio_app.router.add_get("/", handle_root)
 
-    # Puis démarre le serveur HTTP aiohttp
+    # Prépare le serveur AIOHTTP
     runner = web.AppRunner(aio_app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
 
     print("Bot démarré avec webhook...")
+
+    # Lance le bot Telegram
     await app.run_webhook(
         listen="0.0.0.0",
         port=PORT,
