@@ -164,10 +164,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sent = await context.bot.send_message(chat_id=CHANNEL_ID, text=message)
 
         # Envoie résumé dans le groupe admin avec les boutons
-        admin_text = (f"📩 *Message reçu :*
-\n```{message}```\n\n👤 *Utilisateur* : @{user.username if user.username else 'Aucun'}
-"
-                       f"🆔 *ID* : `{user_id}`\n📞 *Téléphone* : `{phone}`")
+        admin_text = (
+        f"📩 *Message reçu :*\n"
+        f"```{message}```\n\n"
+        f"👤 *Utilisateur* : @{user.username if user.username else 'Aucun'}\n"
+        f"🆔 *ID* : `{user_id}`\n"
+        f"📞 *Téléphone* : `{phone}`"
+        )
 
         buttons = InlineKeyboardMarkup([
             [
