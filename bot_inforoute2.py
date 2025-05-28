@@ -125,7 +125,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if update.message.chat.id == BYPASS_CONFIRM_GROUP_ID:
-        await confirm_and_forward(user_id, message, context)
         return
 
     keyboard = InlineKeyboardMarkup([
@@ -164,14 +163,26 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
         await query.edit_message_text("🗑 Message supprimé.")
 
+        await context.bot.send_message(chat_id=ADMIN_LOG_GROUP_ID, text=f"🗑 Message supprimé dans le canal :\n\nID : `{msg_id}`", parse_mode="Markdown")
+
     elif action == "ban" and len(data) == 3:
         uid = int(data[1])
         msg_id = int(data[2])
         phone = await get_user_contact(uid)
-        await save_user_contact(uid, phone)  # assure que le téléphone reste enregistré
+        await save_user_contact(uid, phone)
         await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
         await block_user_id(uid)
         await query.edit_message_text("🚫 Message supprimé et utilisateur banni.")
+
+        user = await context.bot.get_chat(uid)
+        summary = (
+            f"🚫 *Message supprimé et utilisateur banni*\n"
+            f"👤 Utilisateur : @{user.username if user.username else 'Aucun'}\n"
+            f"🆔 ID : `{uid}`\n"
+            f"📞 Téléphone : `{phone}`\n"
+            f"🗑 Message ID : `{msg_id}`"
+        )
+        await context.bot.send_message(chat_id=ADMIN_LOG_GROUP_ID, text=summary, parse_mode="Markdown")
 
 # === FORWARD FUNCTION ===
 async def confirm_and_forward(user_id, message, context):
