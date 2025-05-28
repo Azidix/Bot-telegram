@@ -185,18 +185,9 @@ async def find_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_root(request):
     return web.Response(text="Bot is alive.")
 
-async def start_http_server():
-    http_app = web.Application()
-    http_app.router.add_get("/", handle_root)
-    runner = web.AppRunner(http_app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
-
 # === MAIN ===
 async def main():
     await init_db()
-    await start_http_server()
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -208,12 +199,25 @@ async def main():
     app.add_handler(CommandHandler("finduser", find_user))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
 
-    print("Bot démarré avec webhook...")
-    await app.run_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        webhook_url=WEBHOOK_URL
-    )
+    async def run():
+        runner = web.AppRunner(web.Application())
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", PORT)
+        await site.start()
+
+        # Ajoute la route / pour le GET
+        runner.app.router.add_get("/", handle_root)
+
+        print("Bot démarré avec webhook...")
+        await app.run_webhook(
+            listen="0.0.0.0",
+            port=PORT,
+            webhook_url=WEBHOOK_URL
+        )
+
+    await run()
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    import nest_asyncio
+    nest_asyncio.apply()
+    asyncio.get_event_loop().run_until_complete(main())
