@@ -172,21 +172,29 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif action == "delete" and len(data) == 2:
             msg_id = int(data[1])
-            await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
-            await query.edit_message_text("🗑 Message supprimé.")
+            for uid, message in pending_messages.items():
+                try:
+                    await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
+                    user = await context.bot.get_chat(uid)
+                    phone = await get_user_contact(uid)
 
-            await context.bot.send_message(
-                chat_id=ADMIN_LOG_GROUP_ID,
-                text=(
-                    f"🗑 *Message supprimé du canal*"
-                    f"👤 Nom : {user.first_name} {user.last_name if user.last_name else ''}"
-                    f"🔗 Username : @{user.username if user.username else 'Aucun'}"
-                    f"🆔 ID : `{uid}`"
-                    f"📞 Téléphone : `{phone}`"
-                    f"📨 Message :```{message}```"
-                ),
-                parse_mode="Markdown"
-            )
+                    await context.bot.send_message(
+                        chat_id=ADMIN_LOG_GROUP_ID,
+                        text=(
+                            f"🗑 *Message supprimé du canal*\n"
+                            f"👤 Nom : {user.first_name} {user.last_name if user.last_name else ''}\n"
+                            f"🔗 Username : @{user.username if user.username else 'Aucun'}\n"
+                            f"🆔 ID : `{uid}`\n"
+                            f"📞 Téléphone : `{phone}`\n"
+                            f"\n📨 Message :\n```{message}```"
+                        ),
+                        parse_mode="Markdown"
+                    )
+
+                    await query.edit_message_text("🗑 Message supprimé.")
+                    break
+                except Exception:
+                    continue
 
         elif action == "ban" and len(data) == 3:
             uid = int(data[1])
