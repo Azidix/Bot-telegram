@@ -2,7 +2,6 @@ import logging
 import asyncio
 import asyncpg
 import os
-from aiohttp import web
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (ApplicationBuilder, CallbackQueryHandler,
                           ContextTypes, MessageHandler, CommandHandler, filters)
@@ -181,10 +180,6 @@ async def find_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         await update.message.reply_text("Utilisateur introuvable.")
 
-# === AIOHTTP SERVER FOR RENDER ===
-async def handle_root(request):
-    return web.Response(text="Bot is alive.")
-
 # === MAIN ===
 async def main():
     await init_db()
@@ -199,23 +194,12 @@ async def main():
     app.add_handler(CommandHandler("finduser", find_user))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
 
-    async def run():
-        aio_app = web.Application()
-        aio_app.router.add_get("/", handle_root)
-
-        runner = web.AppRunner(aio_app)
-        await runner.setup()
-        site = web.TCPSite(runner, "0.0.0.0", PORT)
-        await site.start()
-
-        print("Bot démarré avec webhook...")
-        await app.run_webhook(
-            listen="0.0.0.0",
-            port=PORT,
-            webhook_url=WEBHOOK_URL
-        )
-
-    await run()
+    print("Bot démarré avec webhook...")
+    await app.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        webhook_url=WEBHOOK_URL
+    )
 
 if __name__ == '__main__':
     import nest_asyncio
