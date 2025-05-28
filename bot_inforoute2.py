@@ -177,7 +177,21 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await context.bot.send_message(
                 chat_id=ADMIN_LOG_GROUP_ID,
-                text=f"🗑 *Message supprimé du canal*\nID : `{msg_id}`",
+                text=(
+                    f"🗑 *Message supprimé du canal*
+"
+                    f"👤 Nom : {user.first_name} {user.last_name if user.last_name else ''}
+"
+                    f"🔗 Username : @{user.username if user.username else 'Aucun'}
+"
+                    f"🆔 ID : `{uid}`
+"
+                    f"📞 Téléphone : `{phone}`
+"
+                    f"
+📨 Message :
+```{message}```"
+                ),
                 parse_mode="Markdown"
             )
 
