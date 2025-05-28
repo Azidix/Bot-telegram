@@ -3,7 +3,8 @@ import asyncio
 import asyncpg
 import os
 from aiohttp import web
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import (Update, InlineKeyboardButton, InlineKeyboardMarkup,
+                      KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (ApplicationBuilder, CallbackQueryHandler,
                           ContextTypes, MessageHandler, CommandHandler, filters)
 
@@ -114,50 +115,85 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # === GESTION DES MESSAGES TEXTE ===
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user = update.effective_user
+    user_id = user.id
     message = update.message.text
 
-    if await is_user_blocked(user_id):
-        await update.message.reply_text("⛔️ Tu es bloqué.")
-        return
-
+    # Vérifie que l'utilisateur a partagé son numéro
     phone = await get_user_contact(user_id)
     if phone == "Non enregistré":
-        await update.message.reply_text("📞 Tu dois d’abord partager ton numéro.")
+        await update.message.reply_text("📵 Tu dois d'abord partager ton numéro avec /start.")
         return
 
-    # Stocke temporairement le message en attente de validation
+    # Vérifie s'il est bloqué
+    if await is_user_blocked(user_id):
+        await update.message.reply_text("🚫 Tu es actuellement bloqué et ne peux pas envoyer de messages.")
+        return
+
+    # Envoie la confirmation avec boutons
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("Oui !", callback_data=f"confirm|{user_id}"),
+         InlineKeyboardButton("Non ! je me suis trompé", callback_data=f"cancel|{user_id}")]
+    ])
+
+    await update.message.reply_text(f"📝 Ton message :\n\n{message}\n\nSouhaites-tu l'envoyer ?", reply_markup=keyboard)
     pending_messages[user_id] = message
 
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ Oui !", callback_data="confirm_yes"),
-            InlineKeyboardButton("❌ Non ! Je me suis trompé", callback_data="confirm_no")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await update.message.reply_text("📝 Ton message est-il correct ?", reply_markup=reply_markup)
-
-# === GESTION DES RÉPONSES AUX BOUTONS ===
+# === CALLBACK CONFIRMATION ===
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    data = query.data.split("|")
 
-    user_id = query.from_user.id
-    data = query.data
+    if len(data) != 2:
+        return
 
-    if data == "confirm_yes":
-        message = pending_messages.pop(user_id, None)
-        if message:
-            await context.bot.send_message(chat_id=CHANNEL_ID, text=message)
-            await query.edit_message_text("✅ Ton message a été transmis au canal.")
-        else:
-            await query.edit_message_text("⚠️ Aucun message trouvé à valider.")
+    action, user_id = data
+    user_id = int(user_id)
+    message = pending_messages.get(user_id)
 
-    elif data == "confirm_no":
-        pending_messages.pop(user_id, None)
-        await query.edit_message_text("❌ Message annulé. Tu peux renvoyer un nouveau message.")
+    if not message:
+        await query.edit_message_text("⚠️ Aucun message à envoyer.")
+        return
+
+    user = await context.bot.get_chat(user_id)
+    phone = await get_user_contact(user_id)
+
+    if action == "confirm":
+        # Envoie dans le canal principal
+        sent = await context.bot.send_message(chat_id=CHANNEL_ID, text=message)
+
+        # Envoie résumé dans le groupe admin avec les boutons
+        admin_text = (f"📩 *Message reçu :*
+\n```{message}```\n\n👤 *Utilisateur* : @{user.username if user.username else 'Aucun'}
+"
+                       f"🆔 *ID* : `{user_id}`\n📞 *Téléphone* : `{phone}`")
+
+        buttons = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🗑 Poubelle", callback_data=f"delete|{sent.message_id}"),
+                InlineKeyboardButton("Sup & Ban", callback_data=f"ban|{user_id}|{sent.message_id}")
+            ]
+        ])
+
+        await context.bot.send_message(chat_id=ADMIN_LOG_GROUP_ID, text=admin_text, parse_mode="Markdown", reply_markup=buttons)
+        await query.edit_message_text("✅ Ton message a été publié !")
+        del pending_messages[user_id]
+
+    elif action == "cancel":
+        await query.edit_message_text("❌ Message annulé.")
+        del pending_messages[user_id]
+
+    elif action.startswith("delete"):
+        _, msg_id = data
+        await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=int(msg_id))
+        await query.edit_message_text("🗑 Message supprimé.")
+
+    elif action.startswith("ban"):
+        _, uid, msg_id = data
+        await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=int(msg_id))
+        await block_user_id(int(uid))
+        await query.edit_message_text("🚫 Message supprimé et utilisateur banni.")
 
 # === COMMANDE: LISTE DES BLOQUÉS ===
 async def blocked_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -254,7 +290,7 @@ async def main():
     app.add_handler(CommandHandler("phone", get_phone))
     app.add_handler(CommandHandler("finduser", find_user))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
     app.add_handler(CallbackQueryHandler(handle_callback))
 
     await start_web_server()
