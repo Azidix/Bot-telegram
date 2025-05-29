@@ -26,13 +26,15 @@ if not PG_DSN:
 pending_messages = {}
 message_links = {}
 user_contacts = {}
+blacklisted_phones = set()
 
 # === INIT DB ===
 async def init_db():
     conn = await asyncpg.connect(dsn=PG_DSN)
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS blacklist (
-            user_id BIGINT PRIMARY KEY
+            user_id BIGINT PRIMARY KEY,
+            phone TEXT
         )
     """)
     await conn.execute("""
@@ -44,9 +46,15 @@ async def init_db():
     await conn.close()
 
 # === DB FUNCTIONS ===
-async def block_user_id(user_id):
+async def block_user_id(user_id, phone=None):
     conn = await asyncpg.connect(dsn=PG_DSN)
-    await conn.execute("INSERT INTO blacklist (user_id) VALUES ($1) ON CONFLICT DO NOTHING", user_id)
+    if phone:
+        await conn.execute("""
+            INSERT INTO blacklist (user_id, phone) VALUES ($1, $2)
+            ON CONFLICT (user_id) DO UPDATE SET phone = $2
+        """, user_id, phone)
+    else:
+        await conn.execute("INSERT INTO blacklist (user_id) VALUES ($1) ON CONFLICT DO NOTHING", user_id)
     await conn.close()
 
 async def unblock_user_id(user_id):
@@ -209,7 +217,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             phone = await get_user_contact(uid)
             await save_user_contact(uid, phone)
             await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
-            await block_user_id(uid)
+            await block_user_id(uid, phone)
+            blacklisted_phones.add(phone)
             await query.edit_message_text("🚫 Message supprimé et utilisateur banni.")
 
             user = await context.bot.get_chat(uid)
