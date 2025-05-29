@@ -213,7 +213,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif action == "ban" and len(data) == 3:
             uid = int(data[1])
             msg_id = int(data[2])
-            message = pending_messages.get(uid) or message_links.get(msg_id, {}).get("text", "Non disponible")
+            value = message_links.get(msg_id)
+            message = value["text"] if value and "text" in value else "Non disponible"
             phone = await get_user_contact(uid)
             await save_user_contact(uid, phone)
             await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
