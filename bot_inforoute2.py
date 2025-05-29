@@ -214,7 +214,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             uid = int(data[1])
             msg_id = int(data[2])
             value = message_links.get(msg_id)
-            message = value["text"] if value and "text" in value else "Non disponible"
+
+            if not value:
+                await query.edit_message_text("⚠️ Impossible de traiter cette action (message introuvable).")
+                return
+
+            message = value.get("text", "Non disponible")
             phone = await get_user_contact(uid)
             await save_user_contact(uid, phone)
             await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
