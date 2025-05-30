@@ -32,10 +32,11 @@ blacklisted_phones = set()
 async def init_db():
     conn = await asyncpg.connect(dsn=PG_DSN)
 
-    # Création des tables si elles n'existent pas
+    # Création des tables
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS blacklist (
             user_id BIGINT PRIMARY KEY
+            -- phone sera ajoutée ensuite
         )
     """)
     await conn.execute("""
@@ -45,33 +46,55 @@ async def init_db():
         )
     """)
 
-    # Ajout colonne 'phone' dans blacklist si nécessaire
+    # Ajout de la colonne 'phone' à blacklist si elle n'existe pas
     try:
         await conn.execute("ALTER TABLE blacklist ADD COLUMN phone TEXT")
     except asyncpg.exceptions.DuplicateColumnError:
         pass
 
-    # Ajout de la contrainte UNIQUE sur contacts.phone si elle n'existe pas
-    existing_constraint = await conn.fetchval("""
-        SELECT 1 FROM pg_constraint
-        WHERE conname = 'unique_phone'
+    # Contrainte UNIQUE sur contacts.phone
+    contact_constraint = await conn.fetchval("""
+        SELECT 1 FROM pg_constraint WHERE conname = 'unique_phone'
     """)
-    if not existing_constraint:
+    if not contact_constraint:
         await conn.execute("ALTER TABLE contacts ADD CONSTRAINT unique_phone UNIQUE (phone)")
+
+    # Contrainte UNIQUE sur blacklist.phone
+    blacklist_constraint = await conn.fetchval("""
+        SELECT 1 FROM pg_constraint WHERE conname = 'unique_blacklist_phone'
+    """)
+    if not blacklist_constraint:
+        await conn.execute("ALTER TABLE blacklist ADD CONSTRAINT unique_blacklist_phone UNIQUE (phone)")
 
     await conn.close()
 
 # === DB FUNCTIONS ===
 async def block_user_id(user_id, phone=None):
     conn = await asyncpg.connect(dsn=PG_DSN)
+
+    # Si le téléphone est fourni, on vérifie s’il est déjà bloqué par un autre user
     if phone:
+        existing = await conn.fetchrow("SELECT user_id FROM blacklist WHERE phone = $1", phone)
+        if existing and existing["user_id"] != user_id:
+            await conn.close()
+            return False  # Numéro déjà bloqué par un autre utilisateur
+
+        # Insert or update
         await conn.execute("""
-            INSERT INTO blacklist (user_id, phone) VALUES ($1, $2)
+            INSERT INTO blacklist (user_id, phone)
+            VALUES ($1, $2)
             ON CONFLICT (user_id) DO UPDATE SET phone = $2
         """, user_id, phone)
     else:
-        await conn.execute("INSERT INTO blacklist (user_id) VALUES ($1) ON CONFLICT DO NOTHING", user_id)
+        # Ajoute sans numéro si non fourni
+        await conn.execute("""
+            INSERT INTO blacklist (user_id)
+            VALUES ($1)
+            ON CONFLICT DO NOTHING
+        """, user_id)
+
     await conn.close()
+    return True
 
 async def unblock_user_id(user_id):
     conn = await asyncpg.connect(dsn=PG_DSN)
@@ -254,7 +277,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             phone = await get_user_contact(uid)
             await save_user_contact(uid, phone)
             await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
-            await block_user_id(uid, phone)
+            success = await block_user_id(uid, phone)
+            if not success:
+                await query.edit_message_text("🚫 Ce numéro est déjà banni par un autre utilisateur.")
+                return
+
             blacklisted_phones.add(phone)
             await query.edit_message_text("🚫 Message supprimé et utilisateur banni.")
 
