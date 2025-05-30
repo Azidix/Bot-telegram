@@ -113,14 +113,7 @@ async def is_user_blocked(user_id):
     await conn.close()
     return row is not None
 
-async def save_user_contact(user_id, phone):
-    conn = await asyncpg.connect(dsn=PG_DSN)
-    await conn.execute("""
-        INSERT INTO contacts (user_id, phone) VALUES ($1, $2)
-        ON CONFLICT (user_id) DO UPDATE SET phone = $2
-    """, user_id, phone)
-    await conn.close()
-
+# === DB FUNCTIONS - CONTACTS ===
 async def save_user_contact(user_id, phone):
     conn = await asyncpg.connect(dsn=PG_DSN)
 
@@ -139,6 +132,12 @@ async def save_user_contact(user_id, phone):
 
     await conn.close()
     return True
+
+async def get_user_contact(user_id):
+    conn = await asyncpg.connect(dsn=PG_DSN)
+    row = await conn.fetchrow("SELECT phone FROM contacts WHERE user_id = $1", user_id)
+    await conn.close()
+    return row["phone"] if row else "Non enregistré"
 
 # === DEMANDE DE CONTACT À LA PREMIÈRE INTERACTION ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
