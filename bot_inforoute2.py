@@ -36,7 +36,6 @@ async def init_db():
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS blacklist (
             user_id BIGINT PRIMARY KEY
-            -- colonne 'phone' ajoutée ensuite si besoin
         )
     """)
     await conn.execute("""
@@ -46,17 +45,19 @@ async def init_db():
         )
     """)
 
-    # Ajout de la colonne 'phone' à blacklist si elle n'existe pas
+    # Ajout colonne 'phone' dans blacklist si nécessaire
     try:
         await conn.execute("ALTER TABLE blacklist ADD COLUMN phone TEXT")
     except asyncpg.exceptions.DuplicateColumnError:
-        pass  # Colonne déjà existante
+        pass
 
-    # Ajout de la contrainte UNIQUE sur contacts.phone
-    try:
+    # Ajout de la contrainte UNIQUE sur contacts.phone si elle n'existe pas
+    existing_constraint = await conn.fetchval("""
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'unique_phone'
+    """)
+    if not existing_constraint:
         await conn.execute("ALTER TABLE contacts ADD CONSTRAINT unique_phone UNIQUE (phone)")
-    except asyncpg.exceptions.DuplicateObjectError:
-        pass  # Contrainte déjà existante
 
     await conn.close()
 
