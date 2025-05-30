@@ -31,10 +31,12 @@ blacklisted_phones = set()
 # === INIT DB ===
 async def init_db():
     conn = await asyncpg.connect(dsn=PG_DSN)
+
+    # Création des tables si elles n'existent pas
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS blacklist (
-            user_id BIGINT PRIMARY KEY,
-            phone TEXT
+            user_id BIGINT PRIMARY KEY
+            -- colonne 'phone' ajoutée ensuite si besoin
         )
     """)
     await conn.execute("""
@@ -43,6 +45,19 @@ async def init_db():
             phone TEXT
         )
     """)
+
+    # Ajout de la colonne 'phone' à blacklist si elle n'existe pas
+    try:
+        await conn.execute("ALTER TABLE blacklist ADD COLUMN phone TEXT")
+    except asyncpg.exceptions.DuplicateColumnError:
+        pass  # Colonne déjà existante
+
+    # Ajout de la contrainte UNIQUE sur contacts.phone
+    try:
+        await conn.execute("ALTER TABLE contacts ADD CONSTRAINT unique_phone UNIQUE (phone)")
+    except asyncpg.exceptions.DuplicateObjectError:
+        pass  # Contrainte déjà existante
+
     await conn.close()
 
 # === DB FUNCTIONS ===
@@ -82,14 +97,24 @@ async def save_user_contact(user_id, phone):
     """, user_id, phone)
     await conn.close()
 
-async def get_user_contact(user_id):
+async def save_user_contact(user_id, phone):
     conn = await asyncpg.connect(dsn=PG_DSN)
-    row = await conn.fetchrow("SELECT phone FROM contacts WHERE user_id = $1", user_id)
-    await conn.close()
-    return row["phone"] if row else "Non enregistré"
 
-# === LOGGING ===
-logging.basicConfig(level=logging.INFO)
+    # Vérifie si le téléphone est déjà utilisé par un autre user_id
+    existing = await conn.fetchrow("SELECT user_id FROM contacts WHERE phone = $1", phone)
+
+    if existing and existing["user_id"] != user_id:
+        await conn.close()
+        return False  # Numéro déjà utilisé par un autre utilisateur
+
+    # Sinon, on enregistre ou met à jour
+    await conn.execute("""
+        INSERT INTO contacts (user_id, phone) VALUES ($1, $2)
+        ON CONFLICT (user_id) DO UPDATE SET phone = $2
+    """, user_id, phone)
+
+    await conn.close()
+    return True
 
 # === DEMANDE DE CONTACT À LA PREMIÈRE INTERACTION ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -115,11 +140,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.contact
-    if contact.user_id == update.effective_user.id:
-        await save_user_contact(contact.user_id, contact.phone_number)
+    if contact.user_id != update.effective_user.id:
+        await update.message.reply_text("⚠️ Ce numéro ne correspond pas à ton compte.")
+        return
+
+    success = await save_user_contact(contact.user_id, contact.phone_number)
+
+    if success:
         await update.message.reply_text("✅ Merci, ton numéro a bien été enregistré.", reply_markup=ReplyKeyboardRemove())
     else:
-        await update.message.reply_text("⚠️ Ce numéro ne correspond pas à ton compte.")
+        await update.message.reply_text("🚫 Ce numéro est déjà utilisé par un autre utilisateur.")
 
 # === GESTION DES MESSAGES TEXTE ===
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
