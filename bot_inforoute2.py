@@ -310,12 +310,17 @@ async def confirm_and_forward(user_id, message, context):
     context.application.create_task(auto_delete_message(context, sent.message_id))
 
     admin_text = (
-        f"📩 *Message reçu :*\n"
-        f"```{message}```\n\n"
-        f"👤 *Utilisateur* : @{user.username if user.username else 'Aucun'}\n"
-        f"🆔 *ID* : `{user_id}`\n"
-        f"📞 *Téléphone* : `{phone}`"
+    "🆕 *Nouveau message reçu*\n"
+    "━━━━━━━━━━━━━━━━━━━━\n"
+    f"👤 *Utilisateur* : {user.first_name} {user.last_name or ''}\n"
+    f"🔗 *Username* : {('@' + user.username) if user.username else '_(aucun)_'}\n"
+    f"🆔 *ID* : `{user_id}`\n"
+    f"📞 *Téléphone* : `{phone}`\n"
+    "━━━━━━━━━━━━━━━━━━━━\n"
+    "✉️ *Message :*\n"
+    f"```{message}```"
     )
+
 
     buttons = InlineKeyboardMarkup([
         [
