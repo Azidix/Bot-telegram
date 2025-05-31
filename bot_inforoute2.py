@@ -176,7 +176,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     success = await save_user_contact(contact.user_id, contact.phone_number)
 
     if success:
-        await update.message.reply_text("✅ Merci, ton numéro a bien été enregistré.", reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text("✅ Merci, ton numéro a bien été enregistré. Tu peux maintenant m'écrire pour que ton message soit transmis au groupe Inforoute Neuchâtel", reply_markup=ReplyKeyboardRemove())
     else:
         await update.message.reply_text("🚫 Ce numéro est déjà utilisé par un autre utilisateur.")
 
