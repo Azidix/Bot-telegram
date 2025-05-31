@@ -232,45 +232,70 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_text("❌ Message annulé.")
 
         elif action == "delete" and len(data) == 2:
-    msg_id = int(data[1])
-    value = message_links.get(msg_id)
-    if value:
-        uid = value["user_id"]
-        text = value["text"]
-        try:
-            await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
-            user = await context.bot.get_chat(uid)
-            phone = await get_user_contact(uid)
+            msg_id = int(data[1])
+            value = message_links.get(msg_id)
+            if value:
+                uid = value["user_id"]
+                text = value["text"]
+                try:
+                    await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
+                    user = await context.bot.get_chat(uid)
+                    phone = await get_user_contact(uid)
 
-            summary = (
-                f"🗑 *Message supprimé du canal*\n"
-                f"👤 Nom : {user.first_name} {user.last_name if user.last_name else ''}\n"
-                f"🔗 Username : @{user.username if user.username else 'Aucun'}\n"
-                f"🆔 ID : `{uid}`\n"
-                f"📞 Téléphone : `{phone}`\n"
-                f"\n📨 Message :\n```{text}```"
-            )
+                    summary = (
+                        f"🗑 *Message supprimé du canal*\n"
+                        f"👤 Nom : {user.first_name} {user.last_name if user.last_name else ''}\n"
+                        f"🔗 Username : @{user.username if user.username else 'Aucun'}\n"
+                        f"🆔 ID : `{uid}`\n"
+                        f"📞 Téléphone : `{phone}`\n"
+                        f"\n📨 Message :\n```{text}```"
+                    )
 
-            await query.edit_message_text(text=summary, parse_mode="Markdown")
-            del message_links[msg_id]
-
-        except Exception as e:
-            logging.warning(f"Erreur lors de la suppression du message {msg_id}: {e}")
-            await query.edit_message_text("⚠️ Impossible de supprimer ce message.")
-    else:
-        await query.edit_message_text("⚠️ Message non reconnu.")
+                    await query.edit_message_text(text=summary, parse_mode="Markdown")
+                    del message_links[msg_id]
+                except Exception as e:
+                    logging.warning(f"Erreur lors de la suppression du message {msg_id}: {e}")
+                    await query.edit_message_text("⚠️ Impossible de supprimer ce message.")
+            else:
+                await query.edit_message_text("⚠️ Message non reconnu.")
 
         elif action == "ban" and len(data) == 3:
-    uid = int(data[1])
-    msg_id = int(data[2])
-    value = message_links.get(msg_id)
+            uid = int(data[1])
+            msg_id = int(data[2])
+            value = message_links.get(msg_id)
 
-    if not value:
-        await query.edit_message_text("⚠️ Impossible de traiter cette action (message introuvable).")
-        return
+            if not value:
+                await query.edit_message_text("⚠️ Impossible de traiter cette action (message introuvable).")
+                return
 
-    message = value.get("text", "Non disponible")
-    phone = await get_user_contact(uid)
+            message = value.get("text", "Non disponible")
+            phone = await get_user_contact(uid)
+
+            # Empêche doublon de numéro
+            success = await block_user_id(uid, phone)
+            if not success:
+                await query.edit_message_text("🚫 Ce numéro est déjà banni par un autre utilisateur.")
+                return
+
+            try:
+                await save_user_contact(uid, phone)
+                await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
+                blacklisted_phones.add(phone)
+
+                user = await context.bot.get_chat(uid)
+                summary = (
+                    f"🚫 *Message supprimé et utilisateur banni*\n"
+                    f"👤 Utilisateur : @{user.username if user.username else 'Aucun'}\n"
+                    f"🆔 ID : `{uid}`\n"
+                    f"📞 Téléphone : `{phone}`\n"
+                    f"📨 Message :\n```{message}```"
+                )
+
+                await query.edit_message_text(text=summary, parse_mode="Markdown")
+                del message_links[msg_id]
+            except Exception as e:
+                logging.exception(f"Erreur dans Sup & Ban : {e}")
+                await query.edit_message_text("⚠️ Une erreur est survenue pendant l'action.")
 
     # Empêche les doublons si phone déjà banni
     success = await block_user_id(uid, phone)
