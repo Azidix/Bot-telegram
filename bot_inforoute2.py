@@ -250,10 +250,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                     summary = (
                         "🗑 *Message supprimé du canal*\n"
+                        "━━━━━━━━━━━━━━━━━━━━\n"
                         "👤 Nom : {0} {1}\n"
                         "🔗 Username : @{2}\n"
                         "🆔 ID : `{3}`\n"
                         "📞 Téléphone : `{4}`\n"
+                        "━━━━━━━━━━━━━━━━━━━━\n"
                         "\n📨 Message :\n"
                         "> {5}"
                     ).format(
@@ -299,9 +301,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user = await context.bot.get_chat(uid)
                 summary = (
                     "🚫 *Message supprimé et utilisateur banni*\n"
+                    "━━━━━━━━━━━━━━━━━━━━\n"
                     "👤 Utilisateur : @{0}\n"
                     "🆔 ID : `{1}`\n"
                     "📞 Téléphone : `{2}`\n"
+                    "━━━━━━━━━━━━━━━━━━━━\n"
                     "📨 Message :\n"
                     "> {3}"
                 ).format(
