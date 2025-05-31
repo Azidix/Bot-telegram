@@ -2,6 +2,7 @@ import logging
 import asyncio
 import asyncpg
 import os
+import re
 from aiohttp import web
 from telegram import (Update, InlineKeyboardButton, InlineKeyboardMarkup,
                       KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove)
@@ -27,6 +28,11 @@ pending_messages = {}
 message_links = {}
 user_contacts = {}
 blacklisted_phones = set()
+
+# === UTILITAIRE POUR MARKDOWNV2 ===
+def escape_md(text):
+    escape_chars = r'_*[]()~`>#+-=|{}.!'
+    return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', text)
 
 # === INIT DB ===
 async def init_db():
@@ -243,15 +249,23 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     phone = await get_user_contact(uid)
 
                     summary = (
-                        f"🗑 *Message supprimé du canal*\n"
-                        f"👤 Nom : {user.first_name} {user.last_name if user.last_name else ''}\n"
-                        f"🔗 Username : @{user.username if user.username else 'Aucun'}\n"
-                        f"🆔 ID : `{uid}`\n"
-                        f"📞 Téléphone : `{phone}`\n"
-                        f"\n📨 Message :\n```{text}```"
+                        "🗑 *Message supprimé du canal*\n"
+                        "👤 Nom : {0} {1}\n"
+                        "🔗 Username : @{2}\n"
+                        "🆔 ID : `{3}`\n"
+                        "📞 Téléphone : `{4}`\n"
+                        "\n📨 Message :\n"
+                        "> {5}"
+                    ).format(
+                        escape_md(user.first_name or ''),
+                        escape_md(user.last_name or ''),
+                        escape_md(user.username) if user.username else 'Aucun',
+                        uid,
+                        phone,
+                        escape_md(text).replace('\n', '\n> ')
                     )
 
-                    await query.edit_message_text(text=summary, parse_mode="Markdown")
+                    await query.edit_message_text(text=summary, parse_mode="MarkdownV2")
                     del message_links[msg_id]
                 except Exception as e:
                     logging.warning(f"Erreur lors de la suppression du message {msg_id}: {e}")
@@ -284,14 +298,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 user = await context.bot.get_chat(uid)
                 summary = (
-                    f"🚫 *Message supprimé et utilisateur banni*\n"
-                    f"👤 Utilisateur : @{user.username if user.username else 'Aucun'}\n"
-                    f"🆔 ID : `{uid}`\n"
-                    f"📞 Téléphone : `{phone}`\n"
-                    f"📨 Message :\n```{message}```"
+                    "🚫 *Message supprimé et utilisateur banni*\n"
+                    "👤 Utilisateur : @{0}\n"
+                    "🆔 ID : `{1}`\n"
+                    "📞 Téléphone : `{2}`\n"
+                    "📨 Message :\n"
+                    "> {3}"
+                ).format(
+                    escape_md(user.username) if user.username else 'Aucun',
+                    uid,
+                    phone,
+                    escape_md(message).replace('\n', '\n> ')
                 )
 
-                await query.edit_message_text(text=summary, parse_mode="Markdown")
+                await query.edit_message_text(text=summary, parse_mode="MarkdownV2")
                 del message_links[msg_id]
             except Exception as e:
                 logging.exception(f"Erreur dans Sup & Ban : {e}")
@@ -301,7 +321,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.exception(f"Erreur dans handle_callback : {e}")
         await query.edit_message_text("⚠️ Une erreur inattendue est survenue.")
 
-# === FORWARD FUNCTION ===
+# === FORWARD FUNCTION (moderne, block quote design) ===
 async def confirm_and_forward(user_id, message, context):
     user = await context.bot.get_chat(user_id)
     phone = await get_user_contact(user_id)
@@ -310,17 +330,16 @@ async def confirm_and_forward(user_id, message, context):
     context.application.create_task(auto_delete_message(context, sent.message_id))
 
     admin_text = (
-    "🆕 *Nouveau message reçu*\n"
-    "━━━━━━━━━━━━━━━━━━━━\n"
-    f"👤 *Utilisateur* : {user.first_name} {user.last_name or ''}\n"
-    f"🔗 *Username* : {('@' + user.username) if user.username else '_(aucun)_'}\n"
-    f"🆔 *ID* : `{user_id}`\n"
-    f"📞 *Téléphone* : `{phone}`\n"
-    "━━━━━━━━━━━━━━━━━━━━\n"
-    "✉️ *Message :*\n"
-    f"```{message}```"
+        "🆕 *Nouveau message reçu*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 *Utilisateur* : {escape_md(user.first_name or '')} {escape_md(user.last_name or '')}\n"
+        f"🔗 *Username* : {('@' + escape_md(user.username)) if user.username else '_(aucun)_'}\n"
+        f"🆔 *ID* : `{user_id}`\n"
+        f"📞 *Téléphone* : `{phone}`\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "✉️ *Message :*\n"
+        f"> {escape_md(message).replace(chr(10), chr(10) + '> ')}"
     )
-
 
     buttons = InlineKeyboardMarkup([
         [
@@ -331,7 +350,12 @@ async def confirm_and_forward(user_id, message, context):
 
     message_links[sent.message_id] = {"user_id": user_id, "text": message}
 
-    await context.bot.send_message(chat_id=ADMIN_LOG_GROUP_ID, text=admin_text, parse_mode="Markdown", reply_markup=buttons)
+    await context.bot.send_message(
+        chat_id=ADMIN_LOG_GROUP_ID,
+        text=admin_text,
+        parse_mode="MarkdownV2",
+        reply_markup=buttons
+    )
 
 # === COMMANDES ADMIN ===
 async def block_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
