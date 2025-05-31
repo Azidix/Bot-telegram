@@ -205,7 +205,7 @@ async def auto_delete_message(context: ContextTypes.DEFAULT_TYPE, message_id: in
     except Exception as e:
         logging.warning(f"Erreur suppression automatique message {message_id} : {e}")
 
-# === CALLBACK CONFIRMATION ===
+# === CALLBACK CONFIRMATION (corrigé ici) ===
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -297,34 +297,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logging.exception(f"Erreur dans Sup & Ban : {e}")
                 await query.edit_message_text("⚠️ Une erreur est survenue pendant l'action.")
 
-    # Empêche les doublons si phone déjà banni
-    success = await block_user_id(uid, phone)
-    if not success:
-        await query.edit_message_text("🚫 Ce numéro est déjà banni par un autre utilisateur.")
-        return
-
-    try:
-        await save_user_contact(uid, phone)
-        await context.bot.delete_message(chat_id=CHANNEL_ID, message_id=msg_id)
-        blacklisted_phones.add(phone)
-
-        user = await context.bot.get_chat(uid)
-        summary = (
-            f"🚫 *Message supprimé et utilisateur banni*\n"
-            f"👤 Utilisateur : @{user.username if user.username else 'Aucun'}\n"
-            f"🆔 ID : `{uid}`\n"
-            f"📞 Téléphone : `{phone}`\n"
-            f"📨 Message :\n```{message}```"
-        )
-
-        # Édite le message dans le groupe admin
-        await query.edit_message_text(text=summary, parse_mode="Markdown")
-        del message_links[msg_id]
-
     except Exception as e:
-        logging.exception(f"Erreur dans Sup & Ban : {e}")
-        await query.edit_message_text("⚠️ Une erreur est survenue pendant l'action.")
-
+        logging.exception(f"Erreur dans handle_callback : {e}")
+        await query.edit_message_text("⚠️ Une erreur inattendue est survenue.")
 
 # === FORWARD FUNCTION ===
 async def confirm_and_forward(user_id, message, context):
