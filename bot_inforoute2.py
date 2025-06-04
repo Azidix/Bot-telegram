@@ -354,12 +354,28 @@ async def confirm_and_forward(user_id, message, context):
 
     message_links[sent.message_id] = {"user_id": user_id, "text": message}
 
-    await context.bot.send_message(
-        chat_id=ADMIN_LOG_GROUP_ID,
-        text=admin_text,
-        parse_mode="MarkdownV2",
-        reply_markup=buttons
-    )
+    # LOG de debug avant l'envoi
+    logging.info(f"CONFIRM_AND_FORWARD user_id={user_id} message={message[:50]!r}")
+
+    # Envoi principal en MarkdownV2, sinon fallback sans parse_mode
+    try:
+        await context.bot.send_message(
+            chat_id=ADMIN_LOG_GROUP_ID,
+            text=admin_text,
+            parse_mode="MarkdownV2",
+            reply_markup=buttons
+        )
+    except Exception as e:
+        logging.error(f"ERREUR ENVOI ADMIN LOG MarkdownV2 : {e!r} admin_text={admin_text!r}")
+        # Fallback : message brut, sans Markdown
+        try:
+            await context.bot.send_message(
+                chat_id=ADMIN_LOG_GROUP_ID,
+                text=admin_text,
+                reply_markup=buttons
+            )
+        except Exception as ee:
+            logging.error(f"ENVOI ADMIN LOG BRUT ECHEC AUSSI : {ee!r} admin_text={admin_text!r}")
 
 # === COMMANDES ADMIN ===
 async def block_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
